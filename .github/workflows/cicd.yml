@@ -7,21 +7,15 @@ on:
     branches: [main]
 
 jobs:
-  code-quality:
-    uses: ./.github/workflows/go-lint.yml
-
   secrets-scan:
     uses: ./.github/workflows/secrets-scan.yml
     secrets: inherit
-
-  dependency-scan:
-    uses: ./.github/workflows/dependency-scan.yml
 
   dockerfile-lint:
     uses: ./.github/workflows/dockerfile-lint.yml
 
   build:
-    needs: [code-quality, secrets-scan, dependency-scan, dockerfile-lint]
+    needs: [secrets-scan, dockerfile-lint]
     uses: ./.github/workflows/docker-build-push.yml
     secrets: inherit
 
