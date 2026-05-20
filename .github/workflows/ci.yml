@@ -9,7 +9,21 @@ on:
       - '**/*.md'
 
 jobs:
+
+  gitleaks:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build-and-push:
+    needs: gitleaks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +44,8 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME != '' && format('{0}/skillpulse-backend:latest', secrets.DOCKERHUB_USERNAME) || 'skillpulse-backend:latest' }}
             ${{ secrets.DOCKERHUB_USERNAME != '' && format('{0}/skillpulse-backend:{1}', secrets.DOCKERHUB_USERNAME, github.sha) || format('skillpulse-backend:{0}', github.sha) }}
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/skillpulse-backend:cache
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/skillpulse-backend:cache,mode=max
 
       - name: Build and push frontend
         uses: docker/build-push-action@v7
@@ -39,3 +55,27 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME != '' && format('{0}/skillpulse-frontend:latest', secrets.DOCKERHUB_USERNAME) || 'skillpulse-frontend:latest' }}
             ${{ secrets.DOCKERHUB_USERNAME != '' && format('{0}/skillpulse-frontend:{1}', secrets.DOCKERHUB_USERNAME, github.sha) || format('skillpulse-frontend:{0}', github.sha) }}
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/skillpulse-frontend:cache
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/skillpulse-frontend:cache,mode=max
+
+  trivy-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    steps:
+      - name: Scan backend image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/skillpulse-backend:${{ github.sha }}
+          format: table
+          exit-code: 0
+          severity: CRITICAL,HIGH
+
+      - name: Scan frontend image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/skillpulse-frontend:${{ github.sha }}
+          format: table
+          exit-code: 0
+          severity: CRITICAL,HIGH
