@@ -42,6 +42,13 @@ services:
       - /var/run:/var/run:ro
       - /sys:/sys:ro
       - /var/lib/docker:/var/lib/docker:ro
+      - /run/k3s/containerd:/run/k3s/containerd:ro
+      - /var/lib/rancher/k3s:/var/lib/rancher/k3s:ro
+    devices:
+      - /dev/kmsg
+    command:
+      - --containerd=/run/k3s/containerd/containerd.sock
+      - --containerd-namespace=k8s.io
 
 volumes:
   prometheus_data:
