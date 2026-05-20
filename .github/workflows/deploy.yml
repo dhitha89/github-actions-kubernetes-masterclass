@@ -1,17 +1,17 @@
-name: CD
+name: Deploy to k3s
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: [main]
+  workflow_call:
 
 jobs:
   deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: appleboy/ssh-action@v1
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2 via kubectl
+        uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
@@ -27,5 +27,5 @@ jobs:
             kubectl apply -f k8s/10-mysql.yaml
             kubectl apply -f k8s/20-backend.yaml
             kubectl apply -f k8s/30-frontend.yaml
-            kubectl rollout status deployment/backend  -n skillpulse --timeout=120s
+            kubectl rollout status deployment/backend -n skillpulse --timeout=120s
             kubectl rollout status deployment/frontend -n skillpulse --timeout=60s

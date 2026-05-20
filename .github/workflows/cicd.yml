@@ -1,0 +1,37 @@
+name: DevSecOps Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  code-quality:
+    uses: ./.github/workflows/go-lint.yml
+
+  secrets-scan:
+    uses: ./.github/workflows/secrets-scan.yml
+    secrets: inherit
+
+  dependency-scan:
+    uses: ./.github/workflows/dependency-scan.yml
+
+  dockerfile-lint:
+    uses: ./.github/workflows/dockerfile-lint.yml
+
+  build:
+    needs: [code-quality, secrets-scan, dependency-scan, dockerfile-lint]
+    uses: ./.github/workflows/docker-build-push.yml
+    secrets: inherit
+
+  image-scan:
+    needs: [build]
+    uses: ./.github/workflows/image-scan.yml
+    secrets: inherit
+
+  deploy:
+    needs: [image-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
