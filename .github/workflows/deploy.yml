@@ -2,6 +2,10 @@ name: Deploy to k3s
 
 on:
   workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
 
 jobs:
   deploy:
@@ -10,12 +14,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to EC2 via kubectl
+      - name: Deploy to dev EC2
+        if: inputs.environment == 'dev'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            if [ ! -d ~/github-actions-kubernetes-masterclass ]; then
+              git clone https://github.com/dhitha89/github-actions-kubernetes-masterclass.git ~/github-actions-kubernetes-masterclass
+            fi
+            cd ~/github-actions-kubernetes-masterclass
+            git pull origin main
+            export KUBECONFIG=/home/ubuntu/.kube/config
+            kubectl apply -f k8s/00-namespace.yaml
+            kubectl apply -f k8s/10-mysql.yaml
+            kubectl apply -f k8s/20-backend.yaml
+            kubectl apply -f k8s/30-frontend.yaml
+            kubectl rollout status deployment/backend -n skillpulse --timeout=120s
+            kubectl rollout status deployment/frontend -n skillpulse --timeout=60s
+
+      - name: Deploy to prod EC2
+        if: inputs.environment == 'prod'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST_PROD }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY_PROD }}
           script: |
             if [ ! -d ~/github-actions-kubernetes-masterclass ]; then
               git clone https://github.com/dhitha89/github-actions-kubernetes-masterclass.git ~/github-actions-kubernetes-masterclass
