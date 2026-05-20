@@ -37,6 +37,11 @@
         group: ubuntu
         mode: "0755"
 
+    - name: Fix k3s kubeconfig permissions
+      file:
+        path: /etc/rancher/k3s/k3s.yaml
+        mode: "0644"
+
     - name: Copy k3s kubeconfig for ubuntu user
       copy:
         src: /etc/rancher/k3s/k3s.yaml
@@ -83,6 +88,57 @@
         enabled: yes
         state: started
         daemon_reload: yes
+
+    - name: Install Docker
+      shell: curl -fsSL https://get.docker.com | sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: Add ubuntu user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    - name: Enable and start Docker
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Install docker-compose plugin
+      apt:
+        name: docker-compose-plugin
+        state: present
+
+    - name: Create monitoring directory on EC2
+      file:
+        path: /home/ubuntu/monitoring
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Copy prometheus config
+      copy:
+        src: ../../monitoring/prometheus.yml
+        dest: /home/ubuntu/monitoring/prometheus.yml
+        owner: ubuntu
+        group: ubuntu
+        mode: "0644"
+
+    - name: Copy monitoring docker-compose
+      copy:
+        src: ../../monitoring/docker-compose.yml
+        dest: /home/ubuntu/monitoring/docker-compose.yml
+        owner: ubuntu
+        group: ubuntu
+        mode: "0644"
+
+    - name: Start monitoring stack
+      shell: docker compose -f /home/ubuntu/monitoring/docker-compose.yml up -d
+      environment:
+        HOME: /home/ubuntu
 
     - name: Verify k3s is running
       command: kubectl get nodes
